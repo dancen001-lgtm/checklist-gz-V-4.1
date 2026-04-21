@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AMPM — Checklist Operativo GZ</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="./favicon.ico" />
+  <meta name="theme-color" content="#002060" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">AMPM</div>
+      <div class="brandText">
+        <div class="title">Checklist Operativo GZ</div>
+        <div class="subtitle">Modo offline/online • 1 = Cumple • 0 = No cumple</div>
+      </div>
+        </div>
+    <div class="status">
+      <span id="sessionUser" class="muted small" style="margin-right:12px;"></span>
+      <button class="btn sm hidden" id="btnLogout" type="button">Salir</button>
+      <span id="netPill" class="pill net">•</span>
+      <span id="netText">—</span>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card" id="screenLogin">
+  <div class="row space">
+    <div>
+      <div class="kicker">ACCESO</div>
+      <h1>Iniciar sesión</h1>
+      <div class="muted">Ingresá tu usuario y contraseña para acceder al checklist.</div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <label>Usuario</label>
+      <input id="loginUser" type="text" placeholder="Ej: daniel" />
+    </div>
+    <div>
+      <label>Contraseña</label>
+      <input id="loginPass" type="password" placeholder="Tu contraseña" autocomplete="current-password" />
+    </div>
+  </div>
+
+<div class="actions mt">
+  <button class="btn primary" id="btnLogin" type="button">Entrar</button>
+</div>
+
+  <div class="muted small" id="loginMsg" style="margin-top:10px;"></div>
+</section>
+
+<section class="card hidden" id="screenChangePassword">
+  <div class="row space">
+    <div>
+      <div class="kicker">SEGURIDAD</div>
+      <h1>Cambiar contraseña</h1>
+      <div class="muted">Es tu primer ingreso. Debés crear una nueva contraseña para continuar.</div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <label for="changePassNew">Nueva contraseña</label>
+      <input id="changePassNew" type="password" placeholder="Ingresá tu nueva contraseña" autocomplete="new-password" />
+    </div>
+
+    <div>
+      <label for="changePassConfirm">Confirmar contraseña</label>
+      <input id="changePassConfirm" type="password" placeholder="Confirmá tu nueva contraseña" autocomplete="new-password" />
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="btnSaveNewPass" type="button">Guardar contraseña</button>
+    <button class="btn" id="btnCancelChangePass" type="button">Cancelar</button>
+    <button class="btn" id="btnGoLogin" type="button">Volver al login</button>
+  </div>
+
+  <div class="muted small" id="changePassMsg" style="margin-top:10px;"></div>
+</section>
+
+<!-- Pantalla: Inicio -->
+    <section class="card hidden" id="screenStart">
+      <div class="row space">
+        <div>
+          <div class="kicker">INICIO</div>
+          <h1>Iniciar evaluación</h1>
+          <div class="muted">Completá los campos y empezá pregunta por pregunta.</div>
+        </div>
+        <div class="actions right">
+        <button class="btn" id="btnHistory" type="button">Historial</button>
+        <button class="btn" id="btnPerformance" type="button">Desempeño</button>
+        <button class="btn hidden" id="btnUsers" type="button">Usuarios</button>
+       </div>
+      </div>
+
+      <div class="grid2">
+        <div>
+       <label>Tienda (obligatorio)</label>
+       <input id="inStore" type="number" inputmode="numeric" min="1" step="1" placeholder="Ej: 20" />
+       <div class="muted small">Escribí solo el número de tienda. El sistema guardará AMPM + número.</div>
+       <div class="pill" id="storePreview" style="margin-top:8px;display:inline-block;">Tienda final: —</div>
+        </div>
+        <div>
+  <label>GZ (obligatorio)</label>
+  <input id="inGZ" type="text" placeholder="Se llena automático" readonly />
+</div>
+<div>
+  <label>Zona</label>
+  <input id="inZone" type="text" placeholder="Se llena automático" readonly />
+</div>
+<div>
+  <label>Fecha (obligatorio)</label>
+  <input id="inDate" type="date" />
+</div>
+        <div>
+          <label>Hora (obligatorio)</label>
+          <input id="inTime" type="time" />
+        </div>
+      </div>
+
+      <div class="mt">
+        <label>Correo destino (obligatorio)</label>
+        <input id="inEmailTo" type="email" placeholder="ej: gerencia@ampm.com.ni" />
+        <div class="muted small">
+          Recomendado: el envío final se hace desde el backend (Apps Script) cuando tocás <b>Enviar correo</b>.
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="btnStart" type="button">Empezar</button>
+      </div>
+
+      <details class="help">
+        <summary>Cómo funciona</summary>
+        <ul>
+          <li>Respondés pregunta por pregunta con <b>1</b> o <b>0</b>.</li>
+          <li>Al final verás: % total, % por área y lista de fallas (0).</li>
+          <li>Podés exportar a CSV (Excel) y enviar por correo.</li>
+          <li>Se guarda en este dispositivo aunque no haya señal (offline).</li>
+        </ul>
+      </details>
+    </section>
+
+    <!-- Pantalla: Checklist -->
+    <section class="card hidden" id="screenCheck">
+      <div class="row space">
+        <div>
+          <div class="kicker" id="kArea">Área</div>
+          <div class="h2" id="kQuestion">Pregunta</div>
+          <div class="questionText" id="kQuestionText">—</div>
+          <div class="muted" id="kMeta">—</div>
+        </div>
+        <div class="mini">
+          <div class="muted">Progreso</div>
+          <div class="h2" id="kProgress">0/0</div>
+        </div>
+      </div>
+
+      <div class="answers">
+        <button class="btn big yes" id="btnYes" type="button">1 — Cumple</button>
+        <button class="btn big no" id="btnNo" type="button">0 — No cumple</button>
+      </div>
+
+     <div class="notesBox">
+  <label class="notesLabel" for="kNotes">Detalle / hallazgo (opcional)</label>
+  <textarea id="kNotes" class="notesInput" rows="3"
+  placeholder="Ej: Falta rotulación, góndola sucia, no hay precios visibles..."></textarea>
+  <div class="notesHint">Se guarda dentro de esta evaluación y también puede ir en el correo.</div>
+</div>
+<div class="actions">
+        <button class="btn" id="btnBack" type="button">Atrás</button>
+        <button class="btn" id="btnSaveDraft" type="button">Guardar borrador</button>
+        <button class="btn" id="btnCancel" type="button">Cancelar</button>
+      </div>
+    </section>
+
+    <!-- Pantalla: Resultado -->
+    <section class="card hidden" id="screenResult">
+      <div class="row space">
+        <div>
+          <div class="kicker">RESULTADO</div>
+          <div class="resultPct" id="rPct">0%</div>
+          <div class="pill lvl" id="rLevel">—</div>
+          <div class="muted" id="rMeta">—</div>
+        </div>
+
+        <div class="actions right">
+          <button class="btn primary" id="btnFinish" type="button">Cerrar evaluación</button>
+          <button class="btn" id="btnExport" type="button">Exportar (CSV)</button>
+          <button class="btn" id="btnSync" type="button">Enviar correo</button>
+          <button class="btn" id="btnNew" type="button">Nueva evaluación</button>
+        </div>
+      </div>
+
+      <h3>% por área</h3>
+      <div id="areaTable" class="table"></div>
+
+      <h3>Gráfico por área</h3>
+<div class="chartWrap">
+  <canvas id="areaChart"></canvas>
+</div>
+
+<h3 id="areaDetailTitle">Detalle del área</h3>
+<div id="areaDetailList" class="list"></div>
+
+      <h3 id="failsTitle">Preguntas en 0 (0)</h3>
+      <div id="failsList" class="list"></div>
+       <div class="notesBox mt">
+  <label class="notesLabel" for="rGeneralNote">Observación general de la evaluación</label>
+  <textarea id="rGeneralNote" rows="3" placeholder="Ej: Tienda ordenada, pero con oportunidades en Food Service y Caja..."></textarea>
+  <div class="muted">Esta nota se guardará en Google Sheets junto con el resto de la evaluación.</div>
+
+  <div class="mt">
+    <label for="rMaintenanceNote">Recomendaciones de mantenimiento</label>
+    <textarea id="rMaintenanceNote" rows="3" placeholder="Ej: Llamar a mantenimiento para reemplazar puerta, revisar luminaria, reparar fuga..."></textarea>
+    <div class="muted">Usá este campo para trabajos o solicitudes de mantenimiento.</div>
+  </div>
+
+  <div class="mt">
+    <label for="rMarketingNote">Recomendaciones de mercadeo</label>
+    <textarea id="rMarketingNote" rows="3" placeholder="Ej: Solicitar cambio de publicidad, actualizar material POP, reemplazar banner..."></textarea>
+    <div class="muted">Usá este campo para solicitudes o pendientes de mercadeo.</div>
+  </div>
+</div>
+
+<div class="notesBox mt">
+  <label class="notesLabel">Evidencias fotográficas</label>
+  <div class="muted">Podés agregar hasta 14 fotos comprimidas como evidencia.</div>
+
+  <div class="grid2 mt">
+    <div>
+      <label for="photoType">Tipo de evidencia</label>
+      <select id="photoType">
+        <option value="Mantenimiento">Mantenimiento</option>
+        <option value="Mercadeo">Mercadeo</option>
+        <option value="Operativo">Operativo</option>
+      </select>
+    </div>
+  </div>
+
+  <input
+  id="inputPhoto"
+  type="file"
+  accept="image/jpeg,image/png"
+  capture="environment"
+  style="display:none;"
+/>
+
+  <div class="actions">
+    <button class="btn" id="btnAddPhoto" type="button">📷 Agregar evidencia</button>
+  </div>
+
+  <div class="muted small" id="photoCounter" style="margin-top:8px;">
+    0 / 14 fotos cargadas
+  </div>
+
+  <div id="photoList" style="margin-top:12px;"></div>
+</div>
+
+      <details class="help">
+        <summary>Enviar por correo</summary>
+        <p class="muted">
+         El envío se hace desde Apps Script al tocar <b>Enviar correo</b>. Si querés, poné un correo destino en Inicio.
+        </p>
+      </details>
+    </section>
+
+    <!-- Pantalla: Historial -->
+    <section class="card hidden" id="screenHistory">
+      <div class="row space">
+        <div>
+          <div class="kicker">HISTORIAL</div>
+          <h2>Evaluaciones guardadas</h2>
+          <div class="muted">Se guardan en este dispositivo.</div>
+        </div>
+        <div class="actions right">
+          <button class="btn" id="btnBackHome" type="button">Volver</button>
+        </div>
+      </div>
+
+   <div class="mt">
+  <label for="historySearch">Buscar evaluación</label>
+  <input id="historySearch" type="text" placeholder="Ej: AMPM 20, Daniel, 2026-03-18, Operativa..." />
+  <div class="muted small">
+    Podés buscar por tienda, GZ, fecha o nivel.
+  </div>
+</div>
+
+<div class="mt hidden" id="historyUserFilterWrap">
+  <label for="historyUserFilter">Filtrar por usuario</label>
+  <select id="historyUserFilter">
+    <option value="">Todos</option>
+  </select>
+  <div class="muted small">
+    Disponible para admin y supervisor.
+  </div>
+</div>
+
+<div class="mt" id="historyLevelFilterWrap">
+  <label for="historyLevelFilter">Filtrar por nivel</label>
+  <select id="historyLevelFilter">
+    <option value="">Todos</option>
+    <option value="Operativa">Operativa</option>
+    <option value="En riesgo">En riesgo</option>
+    <option value="Crítica">Crítica</option>
+  </select>
+</div>
+
+<div id="historyList" class="hist"></div>
+</section>
+
+<!-- Pantalla: Desempeño -->
+<section class="card hidden" id="screenPerformance">
+  <div class="row space">
+    <div>
+      <div class="kicker">DESEMPEÑO</div>
+      <h2>Análisis de desempeño</h2>
+      <div class="muted">Visualizá el rendimiento por semanas.</div>
+    </div>
+    <div class="actions right">
+      <button class="btn" id="btnBackFromPerformance" type="button">Volver</button>
+    </div>
+  </div>
+
+  <div class="grid2 mt">
+    <div id="filterDistrictWrap">
+      <label>Distrito</label>
+      <select id="filterDistrict">
+        <option value="">Todos</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Zona</label>
+      <select id="filterZone">
+        <option value="">Todas</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Tienda</label>
+      <select id="filterStore">
+        <option value="">Todas</option>
+      </select>
+    </div>
+
+    <div>
+  <label>Semanas</label>
+  <select id="filterWeeks">
+    <option value="10">Últimas 10 semanas</option>
+    <option value="15">Últimas 15 semanas</option>
+    <option value="20">Últimas 20 semanas</option>
+    <option value="custom">Personalizado</option>
+  </select>
+  <input
+    id="filterWeeksCustom"
+    type="number"
+    min="1"
+    step="1"
+    value="10"
+    class="hidden"
+    style="margin-top:8px;"
+    placeholder="Ej: 12"
+  />
+</div>
+  </div>
+
+  <div class="mt">
+  <h3>Desempeño semanal</h3>
+  <div class="chartWrap">
+    <canvas id="performanceChart"></canvas>
+  </div>
+</div>
+
+<div class="mt">
+  <h3 id="performanceAreaDetailTitle">Desempeño por área</h3>
+  <div class="chartWrap">
+    <canvas id="performanceAreaChart"></canvas>
+  </div>
+  <div id="performanceAreaDetailList" class="list" style="display:none;"></div>
+</div>
+
+<div class="mt">
+  <h3 id="performanceStoreDetailTitle">Tiendas con oportunidad</h3>
+  <div class="chartWrap">
+    <canvas id="performanceStoreChart"></canvas>
+  </div>
+  <div id="performanceStoreDetailList" class="list" style="display:none;"></div>
+</div>
+
+<div class="mt">
+  <h3 id="performancePointDetailTitle">Detalle de puntos con falla</h3>
+  <div id="performancePointDetailList" class="list"></div>
+</div>
+
+<div class="mt">
+  <h3>Resumen semanal</h3>
+  <div id="performanceDetail" class="list"></div>
+</div>
+
+</section>
+
+<section class="card hidden" id="screenUsers">
+  <div class="row space">
+    <div>
+      <div class="kicker">USUARIOS</div>
+      <h2>Gestión de usuarios</h2>
+      <div class="muted">Solo visible para admin.</div>
+    </div>
+    <div class="actions right">
+      <button class="btn" id="btnBackFromUsers" type="button">Volver</button>
+    </div>
+  </div>
+
+  <div class="mt">
+    <label for="usersSearch">Buscar usuario</label>
+    <input id="usersSearch" type="text" placeholder="Ej: daniel, admin, MGA..." />
+  </div>
+
+  <div class="mt">
+    <button class="btn primary" id="btnNewUser" type="button">Nuevo usuario</button>
+  </div>
+
+  <div class="card mt hidden" id="userFormCard">
+    <div class="kicker">FORMULARIO</div>
+    <h3 id="userFormTitle">Nuevo usuario</h3>
+
+    <div class="grid2">
+      <div>
+        <label>Usuario</label>
+        <input id="uUsername" type="text" />
+      </div>
+      <div>
+        <label>Nombre</label>
+        <input id="uName" type="text" />
+      </div>
+      <div>
+        <label>Contraseña</label>
+        <input id="uPassword" type="text" placeholder="Solo llenar si querés crear o cambiar" />
+      </div>
+      <div>
+        <label>Rol</label>
+        <select id="uRole">
+          <option value="admin">admin</option>
+          <option value="supervisor">supervisor</option>
+          <option value="evaluador">evaluador</option>
+        </select>
+      </div>
+      <div>
+        <label>Activo</label>
+        <select id="uActive">
+          <option value="SI">SI</option>
+          <option value="NO">NO</option>
+        </select>
+      </div>
+      <div>
+        <label>Debe cambiar contraseña</label>
+        <select id="uMustChangePassword">
+          <option value="SI">SI</option>
+          <option value="NO">NO</option>
+        </select>
+      </div>
+      <div>
+        <label>Distrito</label>
+        <input id="uDistrict" type="text" />
+      </div>
+      <div>
+        <label>Zona</label>
+        <input id="uZone" type="text" />
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" id="btnSaveUser" type="button">Guardar usuario</button>
+    </div>
+
+    <div class="muted small" id="usersMsg" style="margin-top:10px;"></div>
+  </div>
+
+  <h3 style="margin-top:20px;">Usuarios registrados</h3>
+<div id="usersList" class="hist mt"></div>
+
+</section>
+
+<div id="perfLoading" class="perfLoading hidden">
+  <div class="perfLoadingBox">
+    <div class="perfSpinner"></div>
+    <div id="perfLoadingText">Cargando desempeño...</div>
+  </div>
+</div>
+
+  <div id="toast" class="toast">—</div>
+</main>
+
+<div id="versionBox" class="muted small">
+  App: — | Backend: — | Estado: —
+</div>
+
+  <script src="./questions.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="./app.js"></script>
+
+  <script>
+    // Indicador online/offline (visual)
+    function setNet(){
+      const online = navigator.onLine;
+      const pill = document.getElementById("netPill");
+      const txt = document.getElementById("netText");
+      pill.classList.toggle("on", online);
+      txt.textContent = online ? "Online" : "Offline";
+    }
+    window.addEventListener("online", setNet);
+    window.addEventListener("offline", setNet);
+    setNet();
+  </script>
+</body>
+</html>

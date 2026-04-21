@@ -2,7 +2,7 @@
    Offline-first caching.
    Nota: evita cachear URLs chrome-extension:// (causa errores en DevTools)
 */
-const CACHE_NAME = "ampm-checklist-gz-v4";
+const CACHE_NAME = "ampm-checklist-gz-v5";
 const ASSETS = [
   "./",
   "./index.html",

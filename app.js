@@ -25,6 +25,8 @@ let isNewUserMode = true;
 const LS_KEY = "ampm_checklist_gz_v3_evals";
 const LS_SESSION_KEY = "ampm_checklist_gz_v3_session";
 const LS_PENDING_KEY = "ampm_checklist_gz_pending_sync";
+const LS_USERS_KEY = "ampm_checklist_gz_users_cache";
+const LS_USERS_SYNC_KEY = "ampm_checklist_gz_users_cache_at";
 
 // Umbrales de nivel
 const THRESH_OP = 85;
@@ -225,6 +227,40 @@ async function loginUser(){
     return;
   }
 
+  if (!navigator.onLine) {
+  const localUsers = loadUsersCache();
+  const found = localUsers.find(x =>
+    String(x.username || "").trim().toLowerCase() === user.toLowerCase()
+  );
+
+  if (!found) {
+    if (msgEl) msgEl.textContent = "Usuario no disponible sin internet";
+    return;
+  }
+
+  if (String(found.active || "SI").toUpperCase() !== "SI") {
+    if (msgEl) msgEl.textContent = "Usuario inactivo";
+    return;
+  }
+
+  const savedHash = String(found.passwordHash || "");
+  const inputHash = btoa(pass);
+
+  if (!savedHash || savedHash !== inputHash) {
+    if (msgEl) msgEl.textContent = "Contraseña inválida";
+    return;
+  }
+
+  saveSession(found);
+  updateSessionUI();
+  applySessionToForm();
+  applyRoleUI();
+  if (msgEl) msgEl.textContent = "";
+  toast(`Bienvenido ${found.name} ✅ (offline)`, 2500);
+  show("screenStart");
+  return;
+}
+
   try{
     const data = await jsonpRequest(
       `${SCRIPT_URL}?login=1&user=${encodeURIComponent(user)}&pass=${encodeURIComponent(pass)}`,
@@ -252,6 +288,27 @@ async function loginUser(){
     }
 
     saveSession(data.user);
+    const localUsers = loadUsersCache();
+const idx = localUsers.findIndex(x => String(x.username || "").toLowerCase() === String(data.user.username || "").toLowerCase());
+
+const offlineUser = {
+  username: data.user.username || "",
+  name: data.user.name || "",
+  role: data.user.role || "",
+  district: data.user.district || "",
+  zone: data.user.zone || "",
+  active: data.user.active || "SI",
+  mustChangePassword: data.user.mustChangePassword || "NO",
+  passwordHash: btoa(pass)
+};
+
+if (idx >= 0) {
+  localUsers[idx] = { ...localUsers[idx], ...offlineUser };
+} else {
+  localUsers.push(offlineUser);
+}
+
+    saveUsersCache(localUsers);
     updateSessionUI();
     applySessionToForm();
     applyRoleUI();
@@ -401,6 +458,23 @@ function loadSession(){
   }catch(e){
     return null;
   }
+}
+
+function saveUsersCache(list) {
+  localStorage.setItem(LS_USERS_KEY, JSON.stringify(Array.isArray(list) ? list : []));
+  localStorage.setItem(LS_USERS_SYNC_KEY, nowISO());
+}
+
+function loadUsersCache() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_USERS_KEY) || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+
+function getUsersCacheDate() {
+  return localStorage.getItem(LS_USERS_SYNC_KEY) || "";
 }
 
 function loadPendingQueue() {
@@ -3516,7 +3590,21 @@ async function loadUsers(){
       return;
     }
 
-    usersCache = Array.isArray(data.items) ? data.items : [];
+    const incomingUsers = Array.isArray(data.items) ? data.items : [];
+const existingUsers = loadUsersCache();
+
+usersCache = incomingUsers.map(u => {
+  const old = existingUsers.find(x =>
+    String(x.username || "").toLowerCase() === String(u.username || "").toLowerCase()
+  );
+
+  return {
+    ...u,
+    passwordHash: old?.passwordHash || ""
+  };
+});
+
+saveUsersCache(usersCache);
     renderUsers();
   }catch(e){
     console.error("Error cargando usuarios:", e);

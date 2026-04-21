@@ -12,7 +12,7 @@
 const SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzJQwiOq1xRUN1_kHvXBf5POr10jKfTtEmQguQm2UpoLNIPWn4lbtfT_ulvlYCcX74u1Q/exec";
 // Alias usado en partes viejas del código (NO borrar)
 const SCRIPT_URL = SCRIPT_WEB_APP_URL;
-const FRONTEND_VERSION = "GZ-login-v4.2.4";
+const FRONTEND_VERSION = "GZ-login-v4.2.5";
 const STRICT_VERSION_MODE = true;
 let backendVersionDetected = "";
 let versionAlignmentState = "checking";
@@ -24,6 +24,7 @@ let isNewUserMode = true;
 // Storage local
 const LS_KEY = "ampm_checklist_gz_v3_evals";
 const LS_SESSION_KEY = "ampm_checklist_gz_v3_session";
+const LS_PENDING_KEY = "ampm_checklist_gz_pending_sync";
 
 // Umbrales de nivel
 const THRESH_OP = 85;
@@ -399,6 +400,144 @@ function loadSession(){
     return JSON.parse(localStorage.getItem(LS_SESSION_KEY) || "null");
   }catch(e){
     return null;
+  }
+}
+
+function loadPendingQueue() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_PENDING_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function savePendingQueue(queue) {
+  localStorage.setItem(LS_PENDING_KEY, JSON.stringify(queue));
+}
+
+function addToPendingQueue(payload) {
+  const queue = loadPendingQueue();
+  queue.push({
+  id: Date.now(),
+  createdAt: new Date().toISOString(),
+  payload: {
+    ...payload,
+    audit: {
+      ...(payload.audit || {}),
+      origenEnvio: "PENDIENTE_OFFLINE"
+    }
+  }
+});
+  savePendingQueue(queue);
+  updatePendingSyncBadge();
+}
+
+function updatePendingSyncBadge() {
+  const queue = loadPendingQueue();
+  console.log("Pendientes por sincronizar:", queue.length);
+}
+
+async function sendEvaluationToBackend(payload) {
+  const res = await fetch(SCRIPT_WEB_APP_URL, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8"
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error("No se pudo enviar la evaluación");
+  }
+
+  return await res.json();
+}
+
+function sendPendingPayloadWithPopup(payload) {
+  return new Promise((resolve, reject) => {
+    const popup = window.open("", "ampmMailSync", "width=720,height=760");
+
+    if (!popup) {
+      reject(new Error("El navegador bloqueó la ventana emergente"));
+      return;
+    }
+
+    const cleanup = () => {
+      window.removeEventListener("message", onMessage);
+      if (form) form.remove();
+    };
+
+    const onMessage = (event) => {
+      const data = event && event.data ? event.data : null;
+      if (!data || data.type !== "ampm-mail-result") return;
+
+      const sameSync = String(data.syncId || "") === String(payload.syncId || "");
+      if (!sameSync) return;
+
+      cleanup();
+
+      if (data.ok) {
+        resolve(data);
+      } else {
+        reject(new Error(data.msg || "Error enviando pendiente"));
+      }
+    };
+
+    window.addEventListener("message", onMessage);
+
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = SCRIPT_URL;
+    form.target = "ampmMailSync";
+    form.style.display = "none";
+
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "payload";
+    input.value = JSON.stringify(payload);
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+    form.submit();
+  });
+}
+
+async function flushPendingQueue() {
+  const queue = loadPendingQueue();
+  if (!queue.length) return;
+
+  if (!navigator.onLine) return;
+
+  const remaining = [];
+
+  for (const item of queue) {
+    try {
+      await sendPendingPayloadWithPopup(item.payload);
+
+      const syncId = String(item?.payload?.syncId || "");
+      if (syncId) {
+        const list = loadEvals();
+        const idx = list.findIndex(x => String(x.id) === syncId);
+
+        if (idx >= 0) {
+          list[idx].synced = true;
+          list[idx].syncedAt = nowISO();
+          list[idx].updatedAt = nowISO();
+          list[idx].result = list[idx].result || computeResult(list[idx]);
+          saveEvals(list);
+        }
+      }
+    } catch (err) {
+      remaining.push(item);
+      console.error("Pendiente no enviado:", err);
+    }
+  }
+
+  savePendingQueue(remaining);
+  updatePendingSyncBadge();
+
+  if (!remaining.length) {
+    toast("Pendientes sincronizados ✅", 3000);
   }
 }
 
@@ -2421,6 +2560,82 @@ function exportCSV(ev){
   URL.revokeObjectURL(url);
 }
 
+function buildAuditMeta(ev){
+  const session = loadSession() || {};
+
+  return {
+    username: ev?.username || session?.username || "",
+    nombreUsuario: ev?.gz || session?.name || "",
+    role: ev?.role || session?.role || "",
+    district: ev?.district || session?.district || "",
+    zone: ev?.zone || session?.zone || "",
+    tienda: ev?.store || "",
+    gz: ev?.gz || "",
+    fechaEvaluacion: ev?.dateISO || "",
+    fechaEnvioISO: nowISO(),
+    online: navigator.onLine ? "SI" : "NO",
+    userAgent: navigator.userAgent || "",
+    plataforma: navigator.platform || "",
+    idioma: navigator.language || ""
+  };
+}
+
+function buildSyncPayload(ev){
+  const r = ev.result || computeResult(ev);
+  const audit = buildAuditMeta(ev);
+
+  return {
+    to: (ev.emailTo || "").trim(),
+    subject: `AMPM Checklist ${ev.store} | ${r.pct}% | ${r.level} | ${formatDateTime(ev.dateISO)}`,
+    body: buildEmailBody(ev),
+    returnTo: window.location.origin + window.location.pathname,
+    syncId: ev.id,
+    header: {
+      id: ev.id,
+      store: ev.store,
+      gz: ev.gz,
+      zone: ev.zone || "",
+      username: ev.username || "",
+      role: ev.role || "",
+      district: ev.district || "",
+      dateISO: ev.dateISO,
+      createdAt: ev.createdAt,
+      updatedAt: ev.updatedAt,
+      emailTo: ev.emailTo || "",
+      pct: r.pct,
+      level: r.level,
+      ok: r.ok,
+      total: r.total,
+      generalNote: ev.generalNote || "",
+      maintenanceNote: ev.maintenanceNote || "",
+      marketingNote: ev.marketingNote || "",
+      synced: ev.synced === true,
+      syncedAt: ev.syncedAt || "",
+      frontendVersion: FRONTEND_VERSION,
+      backendVersion: backendVersionDetected || "",
+      versionStatus: versionAlignmentState || ""
+    },
+    audit,
+    answers: ev.answers.map((a, idx) => ({
+      order: idx + 1,
+      qid: a.qid,
+      area: a.area,
+      text: a.text,
+      val: a.val,
+      responseText: a.val === 1 ? "Cumple" : "No cumple",
+      note: a.note || ""
+    })),
+    evidences: (evidences || []).map((img, idx) => ({
+      name: `evidencia_${String(idx + 1).padStart(2, "0")}.jpg`,
+      mimeType: "image/jpeg",
+      base64: String(img.image || "").split(",")[1] || "",
+      note: img.note || "",
+      type: img.type || "Operativo",
+      sizeKB: Number(img.sizeKB || 0)
+    }))
+  };
+}
+
 /* =========================
    SYNC + EMAIL (Apps Script)
 ========================= */
@@ -2451,62 +2666,18 @@ async function syncPending(onlyThisId=null){
 
 const freshList = loadEvals();
 const freshEv = freshList.find(x => x.id === ev.id) || ev;
-const freshR = freshEv.result || computeResult(freshEv);
+const payload = buildSyncPayload(freshEv);
 
-const subject = `AMPM Checklist ${freshEv.store} | ${freshR.pct}% | ${freshR.level} | ${formatDateTime(freshEv.dateISO)}`;
-const body = buildEmailBody(freshEv);
-const returnTo = window.location.origin + window.location.pathname;
-const syncId = freshEv.id;
-
-const payload = {
-  to,
-  subject,
-  body,
-  returnTo,
-  syncId,
-  header: {
-    id: freshEv.id,
-    store: freshEv.store,
-    gz: freshEv.gz,
-    zone: freshEv.zone || "",
-    username: freshEv.username || "",
-    role: freshEv.role || "",
-    district: freshEv.district || "",
-    dateISO: freshEv.dateISO,
-    createdAt: freshEv.createdAt,
-    updatedAt: freshEv.updatedAt,
-    emailTo: freshEv.emailTo || "",
-    pct: freshR.pct,
-    level: freshR.level,
-    ok: freshR.ok,
-    total: freshR.total,
-    generalNote: freshEv.generalNote || "",
-    maintenanceNote: freshEv.maintenanceNote || "",
-    marketingNote: freshEv.marketingNote || "",
-    synced: freshEv.synced === true,
-    syncedAt: freshEv.syncedAt || "",
-    frontendVersion: FRONTEND_VERSION,
-    backendVersion: backendVersionDetected || "",
-    versionStatus: versionAlignmentState || ""
-  },
-  answers: freshEv.answers.map((a, idx) => ({
-    order: idx + 1,
-    qid: a.qid,
-    area: a.area,
-    text: a.text,
-    val: a.val,
-    responseText: a.val === 1 ? "Cumple" : "No cumple",
-    note: a.note || ""
-  })),
-  evidences: (evidences || []).map((img, idx) => ({
-  name: `evidencia_${String(idx + 1).padStart(2, "0")}.jpg`,
-  mimeType: "image/jpeg",
-  base64: String(img.image || "").split(",")[1] || "",
-  note: img.note || "",
-  type: img.type || "Operativo",
-  sizeKB: Number(img.sizeKB || 0)
-}))
+payload.audit = {
+  ...(payload.audit || {}),
+  origenEnvio: "ENVIO_DIRECTO"
 };
+
+if (!navigator.onLine) {
+  addToPendingQueue(payload);
+  toast("Sin internet. Evaluación guardada en pendientes.", 3500);
+  return;
+}
 
   const popup = window.open("", "ampmMailSync", "width=720,height=760");
 
@@ -2529,7 +2700,7 @@ const payload = {
 
   document.body.appendChild(form);
   form.submit();
-  form.remove();
+  if (form) form.remove();
 
   toast("Enviando correo...", 2200);
 }
@@ -3487,4 +3658,63 @@ async function saveUserFromForm(){
     console.error("Error guardando usuario:", e);
     if(msgEl) msgEl.textContent = "Error guardando usuario";
   }
+}
+
+let swRegistration = null;
+let refreshingPage = false;
+
+function showUpdateBanner() {
+  const banner = document.getElementById("updateBanner");
+  if (banner) banner.style.display = "block";
+}
+
+function hideUpdateBanner() {
+  const banner = document.getElementById("updateBanner");
+  if (banner) banner.style.display = "none";
+}
+
+function setupUpdateButton() {
+  const btn = document.getElementById("btnUpdateNow");
+  if (!btn) return;
+
+  btn.addEventListener("click", () => {
+    if (!swRegistration || !swRegistration.waiting) return;
+    swRegistration.waiting.postMessage({ type: "SKIP_WAITING" });
+  });
+}
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
+    try {
+      swRegistration = await navigator.serviceWorker.register("./sw.js");
+
+      setupUpdateButton();
+
+      if (swRegistration.waiting) {
+        showUpdateBanner();
+      }
+
+      swRegistration.addEventListener("updatefound", () => {
+        const newWorker = swRegistration.installing;
+        if (!newWorker) return;
+
+        newWorker.addEventListener("statechange", () => {
+          if (
+            newWorker.state === "installed" &&
+            navigator.serviceWorker.controller
+          ) {
+            showUpdateBanner();
+          }
+        });
+      });
+
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (refreshingPage) return;
+        refreshingPage = true;
+        window.location.reload();
+      });
+    } catch (err) {
+      console.error("Error registrando SW:", err);
+    }
+  });
 }

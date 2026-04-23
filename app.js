@@ -1070,6 +1070,14 @@ function finishEval(){
   });
 
   saveGeneralNotes();
+
+  current.evidences = evidences.map(ev => ({
+    image: ev.image || "",
+    note: ev.note || "",
+    type: ev.type || "Operativo",
+    sizeKB: Number(ev.sizeKB || 0)
+  }));
+
   current.result = computeResult(current);
   current.updatedAt = nowISO();
   upsertEval(current);
@@ -2670,6 +2678,7 @@ function buildAuditMeta(ev){
 function buildSyncPayload(ev){
   const r = ev.result || computeResult(ev);
   const audit = buildAuditMeta(ev);
+  const safeEvidences = Array.isArray(ev.evidences) ? ev.evidences : [];
 
   return {
     to: (ev.emailTo || "").trim(),
@@ -2712,16 +2721,23 @@ function buildSyncPayload(ev){
       responseText: a.val === 1 ? "Cumple" : "No cumple",
       note: a.note || ""
     })),
-    evidences: (evidences || []).map((img, idx) => ({
+   evidences: safeEvidences
+  .filter(img => img.image && String(img.image).includes(","))
+  .map((img, idx) => {
+    const parts = String(img.image).split(",");
+    const base64 = parts.length > 1 ? parts[1] : "";
+
+    return {
       name: `evidencia_${String(idx + 1).padStart(2, "0")}.jpg`,
       mimeType: "image/jpeg",
-      base64: String(img.image || "").split(",")[1] || "",
+      base64: base64,
       note: img.note || "",
       type: img.type || "Operativo",
       sizeKB: Number(img.sizeKB || 0)
-    }))
+    };
+  })
   };
-}
+  }
 
 /* =========================
    SYNC + EMAIL (Apps Script)
@@ -3347,52 +3363,58 @@ function show(screenId){
 }
 
 function renderPhotoList(){
-  const wrap = $("photoList");
-  if(!wrap) return;
+  const targets = [$("photoList"), $("resultPhotoList")].filter(Boolean);
+  if(!targets.length) return;
 
-  wrap.style.display = "grid";
-  wrap.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
-  wrap.style.gap = "12px";
-  wrap.style.alignItems = "start";
+  targets.forEach(wrap => {
+    wrap.style.display = "grid";
+    wrap.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+    wrap.style.gap = "12px";
+    wrap.style.alignItems = "start";
 
-  wrap.innerHTML = "";
+    wrap.innerHTML = "";
 
-  evidences.forEach((ev, i) => {
-    const div = document.createElement("div");
-    div.className = "photoItem";
-    div.style.width = "100%";
-    div.style.minWidth = "0";
+    evidences.forEach((ev, i) => {
+      const div = document.createElement("div");
+      div.className = "photoItem";
+      div.style.width = "100%";
+      div.style.minWidth = "0";
 
-    div.innerHTML = `
-      <div class="photoTop">
-        <div class="photoBadge">${ev.type || "Operativo"} · Foto ${i + 1}${ev.sizeKB ? ` · ${ev.sizeKB} KB` : ""}</div>
-        <button type="button" class="btn sm danger" onclick="removePhoto(${i})">Eliminar</button>
-      </div>
+      div.innerHTML = `
+        <div class="photoTop">
+          <div class="photoBadge">${ev.type || "Operativo"} · Foto ${i + 1}${ev.sizeKB ? ` · ${ev.sizeKB} KB` : ""}</div>
+          <button type="button" class="btn sm danger" onclick="removePhoto(${i})">Eliminar</button>
+        </div>
 
-      <img
-  src="${ev.image}"
-  class="photoPreview"
-  alt="Evidencia ${i + 1}"
-  style="width:100%;height:160px;object-fit:cover;object-position:center;display:block;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);"
-/>
+        <img
+          src="${ev.image}"
+          class="photoPreview"
+          alt="Evidencia ${i + 1}"
+          style="width:100%;height:160px;object-fit:cover;border-radius:12px;"
+        />
 
-      <div class="photoMeta">
-        <textarea
-          class="photoNote"
-          placeholder="Describe esta evidencia..."
-          oninput="updatePhotoNote(${i}, this.value)"
-        >${escapeHTML(ev.note || "")}</textarea>
-      </div>
-    `;
+        <div class="photoMeta">
+          <textarea
+            class="photoNote"
+            placeholder="Describe esta evidencia..."
+            oninput="updatePhotoNote(${i}, this.value)"
+          >${escapeHTML(ev.note || "")}</textarea>
+        </div>
+      `;
 
-    wrap.appendChild(div);
+      wrap.appendChild(div);
+    });
   });
 }
 
 function updatePhotoCounter(){
-  const el = $("photoCounter");
-  if(!el) return;
-  el.textContent = `${evidences.length} / 14 fotos cargadas`;
+  const text = `${evidences.length} / 14 fotos cargadas`;
+
+  const el1 = $("photoCounter");
+  const el2 = $("resultPhotoCounter");
+
+  if(el1) el1.textContent = text;
+  if(el2) el2.textContent = text;
 }
 
 function removePhoto(i){
@@ -3412,7 +3434,7 @@ function saveEvidenceState(){
   if(!current) return;
 
   current.evidences = evidences.map(ev => ({
-    image: "", // no guardar base64 en localStorage
+    image: ev.image || "",
     note: ev.note || "",
     type: ev.type || "Operativo",
     sizeKB: Number(ev.sizeKB || 0)

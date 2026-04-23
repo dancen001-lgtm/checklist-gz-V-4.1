@@ -909,20 +909,33 @@ function validateStart(){
   }
 
   const store = `AMPM ${storeNumber}`;
-  const emailTo = ($("inEmailTo")?.value || "").trim();
+ const emailRaw = ($("inEmailTo")?.value || "").trim();
+const emails = parseEmails(emailRaw);
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-if(!emailTo){
+if(!emails.length){
   toast("Falta correo destino");
   return null;
 }
 
-if(!emailRegex.test(emailTo)){
-  toast("Correo no válido");
+const invalidEmails = emails.filter(x => !isValidEmail(x));
+if(invalidEmails.length){
+  toast("Correo(s) no válido(s): " + invalidEmails.join(", "));
   return null;
 }
+
+const emailTo = emails.join(",");
   return { store, gz, zone, date, time, emailTo };
+}
+
+function parseEmails(value){
+  return String(value || "")
+    .split(/[;,]+/)
+    .map(x => x.trim())
+    .filter(Boolean);
+}
+
+function isValidEmail(email){
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
 }
 
 function startEval(){

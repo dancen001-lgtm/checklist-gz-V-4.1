@@ -126,7 +126,10 @@
 
       <div class="mt">
         <label>Correo destino (obligatorio)</label>
-        <input id="inEmailTo" type="email" placeholder="ej: gerencia@ampm.com.ni" />
+        <input id="inEmailTo" type="text" placeholder="ej: gerencia@ampm.com.ni, supervisor@ampm.com.ni" />
+        <div class="muted small">
+         Podés escribir varios correos separados por coma.
+         </div>
         <div class="muted small">
           Recomendado: el envío final se hace desde el backend (Apps Script) cuando tocás <b>Enviar correo</b>.
         </div>
@@ -172,6 +175,39 @@
   <textarea id="kNotes" class="notesInput" rows="3"
   placeholder="Ej: Falta rotulación, góndola sucia, no hay precios visibles..."></textarea>
   <div class="notesHint">Se guarda dentro de esta evaluación y también puede ir en el correo.</div>
+</div>
+<div class="notesBox mt" id="checkEvidenceBox">
+  <label class="notesLabel">Evidencias fotográficas</label>
+  <div class="muted">Podés agregar hasta 14 fotos comprimidas durante la evaluación.</div>
+
+  <div class="grid2 mt">
+    <div>
+      <label for="photoType">Tipo de evidencia</label>
+      <select id="photoType">
+        <option value="Mantenimiento">Mantenimiento</option>
+        <option value="Mercadeo">Mercadeo</option>
+        <option value="Operativo">Operativo</option>
+      </select>
+    </div>
+  </div>
+
+  <input
+    id="inputPhoto"
+    type="file"
+    accept="image/jpeg,image/png"
+    capture="environment"
+    style="display:none;"
+  />
+
+  <div class="actions">
+    <button class="btn" id="btnAddPhoto" type="button">📷 Agregar evidencia</button>
+  </div>
+
+  <div class="muted small" id="photoCounter" style="margin-top:8px;">
+    0 / 14 fotos cargadas
+  </div>
+
+  <div id="photoList" style="margin-top:12px;"></div>
 </div>
 <div class="actions">
         <button class="btn" id="btnBack" type="button">Atrás</button>
@@ -227,40 +263,6 @@
     <textarea id="rMarketingNote" rows="3" placeholder="Ej: Solicitar cambio de publicidad, actualizar material POP, reemplazar banner..."></textarea>
     <div class="muted">Usá este campo para solicitudes o pendientes de mercadeo.</div>
   </div>
-</div>
-
-<div class="notesBox mt">
-  <label class="notesLabel">Evidencias fotográficas</label>
-  <div class="muted">Podés agregar hasta 14 fotos comprimidas como evidencia.</div>
-
-  <div class="grid2 mt">
-    <div>
-      <label for="photoType">Tipo de evidencia</label>
-      <select id="photoType">
-        <option value="Mantenimiento">Mantenimiento</option>
-        <option value="Mercadeo">Mercadeo</option>
-        <option value="Operativo">Operativo</option>
-      </select>
-    </div>
-  </div>
-
-  <input
-  id="inputPhoto"
-  type="file"
-  accept="image/jpeg,image/png"
-  capture="environment"
-  style="display:none;"
-/>
-
-  <div class="actions">
-    <button class="btn" id="btnAddPhoto" type="button">📷 Agregar evidencia</button>
-  </div>
-
-  <div class="muted small" id="photoCounter" style="margin-top:8px;">
-    0 / 14 fotos cargadas
-  </div>
-
-  <div id="photoList" style="margin-top:12px;"></div>
 </div>
 
       <details class="help">

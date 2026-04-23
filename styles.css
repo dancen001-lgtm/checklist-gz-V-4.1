@@ -467,19 +467,19 @@ select option{background:#0b1b35}
 }
 
 #checkEvidenceBox{
-  position: sticky;
-  bottom: 0;
-  z-index: 20;
-  background: #0b1f3a;
+  position: static;
+  bottom: auto;
+  z-index: auto;
+  background: rgba(255,255,255,.03);
   border: 1px solid rgba(255,255,255,.08);
-  box-shadow: 0 -6px 18px rgba(0,0,0,.18);
+  box-shadow: none;
   padding-bottom: 12px;
 }
 
 @media (max-width: 768px){
   #checkEvidenceBox{
-    position: sticky;
-    bottom: 0;
-    z-index: 20;
+    position: static;
+    bottom: auto;
+    z-index: auto;
   }
 }

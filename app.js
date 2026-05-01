@@ -12,7 +12,7 @@
 const SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzJQwiOq1xRUN1_kHvXBf5POr10jKfTtEmQguQm2UpoLNIPWn4lbtfT_ulvlYCcX74u1Q/exec";
 // Alias usado en partes viejas del código (NO borrar)
 const SCRIPT_URL = SCRIPT_WEB_APP_URL;
-const FRONTEND_VERSION = "GZ-login-v4.2.6";
+const FRONTEND_VERSION = "GZ-login-v4.2.7";
 const STRICT_VERSION_MODE = true;
 let backendVersionDetected = "";
 let versionAlignmentState = "checking";
@@ -2681,7 +2681,7 @@ function buildSyncPayload(ev){
   const safeEvidences = Array.isArray(ev.evidences) ? ev.evidences : [];
 
   return {
-    to: (ev.emailTo || "").trim(),
+    to: parseEmails(ev.emailTo),
     subject: `AMPM Checklist ${ev.store} | ${r.pct}% | ${r.level} | ${formatDateTime(ev.dateISO)}`,
     body: buildEmailBody(ev),
     returnTo: window.location.origin + window.location.pathname,

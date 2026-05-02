@@ -3183,8 +3183,8 @@ function init(){
 };
 
 $("btnAddPhoto").onclick = () => {
-  if(evidences.length >= 14){
-    toast("Máximo 14 fotos");
+  if(evidences.length >= 25){
+    toast("Máximo 25 fotos");
     return;
   }
   $("inputPhoto").click();
@@ -3408,7 +3408,7 @@ function renderPhotoList(){
 }
 
 function updatePhotoCounter(){
-  const text = `${evidences.length} / 14 fotos cargadas`;
+  const text = `${evidences.length} / 25 fotos cargadas`;
 
   const el1 = $("photoCounter");
   const el2 = $("resultPhotoCounter");
@@ -3568,8 +3568,8 @@ $("inputPhoto").onchange = async (e) => {
   const file = e.target.files[0];
   if(!file) return;
 
-  if(evidences.length >= 14){
-    toast("Máximo 14 fotos");
+  if(evidences.length >= 25){
+    toast("Máximo 25 fotos");
     e.target.value = "";
     return;
   }

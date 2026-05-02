@@ -164,11 +164,13 @@ function handleMailReturn(){
       list[idx].syncedAt = nowISO();
       list[idx].updatedAt = nowISO();
       list[idx].result = list[idx].result || computeResult(list[idx]);
+      list[idx].evidences = [];
       saveEvals(list);
     }
 
     current = null;
     qIdx = 0;
+    evidences = [];
     show("screenStart");
     toast("Correo enviado ✅ Listo para nueva evaluación", 3200);
   } else {
@@ -191,12 +193,13 @@ function handleMailMessage(event){
     const idx = list.findIndex(x => x.id === syncId);
 
     if(idx >= 0){
-      list[idx].synced = true;
-      list[idx].syncedAt = nowISO();
-      list[idx].updatedAt = nowISO();
-      list[idx].result = list[idx].result || computeResult(list[idx]);
-      saveEvals(list);
-    }
+  list[idx].synced = true;
+  list[idx].syncedAt = nowISO();
+  list[idx].updatedAt = nowISO();
+  list[idx].result = list[idx].result || computeResult(list[idx]);
+  list[idx].evidences = [];
+  saveEvals(list);
+}
 
     current = null;
     qIdx = 0;
@@ -594,12 +597,13 @@ async function flushPendingQueue() {
         const idx = list.findIndex(x => String(x.id) === syncId);
 
         if (idx >= 0) {
-          list[idx].synced = true;
-          list[idx].syncedAt = nowISO();
-          list[idx].updatedAt = nowISO();
-          list[idx].result = list[idx].result || computeResult(list[idx]);
-          saveEvals(list);
-        }
+        list[idx].synced = true;
+        list[idx].syncedAt = nowISO();
+        list[idx].updatedAt = nowISO();
+        list[idx].result = list[idx].result || computeResult(list[idx]);
+        list[idx].evidences = [];
+        saveEvals(list);
+      }
       }
     } catch (err) {
       remaining.push(item);
@@ -648,10 +652,20 @@ function applySessionToForm(){
     inZone.value = session?.zone || "";
   }
 }
+
 function upsertEval(ev){
+  const safeEv = {
+    ...ev,
+    evidences: [],
+    _tempEvidences: [] // NUNCA guardar fotos temporales en localStorage
+  };
+
   const list = loadEvals();
-  const idx = list.findIndex(x=>x.id===ev.id);
-  if(idx>=0) list[idx]=ev; else list.unshift(ev);
+  const idx = list.findIndex(x=>x.id===safeEv.id);
+
+  if(idx>=0) list[idx]=safeEv;
+  else list.unshift(safeEv);
+
   saveEvals(list);
 }
 
@@ -923,7 +937,8 @@ if(invalidEmails.length){
   return null;
 }
 
-const emailTo = emails.join(",");
+const uniqueEmails = [...new Set(emails.map(x => x.toLowerCase()))];
+const emailTo = uniqueEmails.join(",");
   return { store, gz, zone, date, time, emailTo };
 }
 
@@ -1071,16 +1086,21 @@ function finishEval(){
 
   saveGeneralNotes();
 
-  current.evidences = evidences.map(ev => ({
-    image: ev.image || "",
-    note: ev.note || "",
-    type: ev.type || "Operativo",
-    sizeKB: Number(ev.sizeKB || 0)
-  }));
+  current._tempEvidences = evidences.map(ev => ({
+  image: ev.image || "",
+  note: ev.note || "",
+  type: ev.type || "Operativo",
+  sizeKB: Number(ev.sizeKB || 0)
+}));
 
   current.result = computeResult(current);
-  current.updatedAt = nowISO();
-  upsertEval(current);
+current.updatedAt = nowISO();
+
+// Guardamos la evaluación local SIN fotos pesadas
+upsertEval({
+  ...current,
+  evidences: []
+});
 
   renderResult(current);
   show("screenResult");
@@ -1308,8 +1328,8 @@ const r = ev.result || {
   const generalNoteEl = $("rGeneralNote");
   const maintenanceNoteEl = $("rMaintenanceNote");
   const marketingNoteEl = $("rMarketingNote");
-  evidences = Array.isArray(ev.evidences)
-  ? ev.evidences.map(x => ({
+  evidences = Array.isArray(ev._tempEvidences) && ev._tempEvidences.length
+  ? ev._tempEvidences.map(x => ({
       image: x.image || "",
       note: x.note || "",
       type: x.type || "Operativo",
@@ -2678,7 +2698,10 @@ function buildAuditMeta(ev){
 function buildSyncPayload(ev){
   const r = ev.result || computeResult(ev);
   const audit = buildAuditMeta(ev);
-  const safeEvidences = Array.isArray(ev.evidences) ? ev.evidences : [];
+  const safeEvidences =
+  (Array.isArray(ev._tempEvidences) && ev._tempEvidences.length)
+    ? ev._tempEvidences
+    : [];
 
   return {
     to: parseEmails(ev.emailTo),
@@ -2756,7 +2779,9 @@ async function syncPending(onlyThisId=null){
     return;
   }
 
-  const ev = pending[0];
+  const ev = (current && onlyThisId && current.id === onlyThisId)
+  ? current
+  : pending[0];
   const r = ev.result || computeResult(ev);
   const to = (ev.emailTo || "").trim();
 
@@ -2768,7 +2793,10 @@ async function syncPending(onlyThisId=null){
   saveGeneralNotes();
 
 const freshList = loadEvals();
-const freshEv = freshList.find(x => x.id === ev.id) || ev;
+const freshEv = (current && current.id === ev.id)
+  ? current
+  : (freshList.find(x => x.id === ev.id) || ev);
+
 const payload = buildSyncPayload(freshEv);
 
 payload.audit = {
@@ -3433,15 +3461,9 @@ function updatePhotoNote(i, value){
 function saveEvidenceState(){
   if(!current) return;
 
-  current.evidences = evidences.map(ev => ({
-    image: ev.image || "",
-    note: ev.note || "",
-    type: ev.type || "Operativo",
-    sizeKB: Number(ev.sizeKB || 0)
-  }));
-
+  // Las fotos quedan solo en memoria en la variable evidences.
+  // No se guardan en current ni en localStorage.
   current.updatedAt = nowISO();
-  upsertEval(current);
 }
 
 function blobToBase64(blob){

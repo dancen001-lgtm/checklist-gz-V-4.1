@@ -3575,7 +3575,7 @@ $("inputPhoto").onchange = async (e) => {
   }
 
   try{
-    const compressed = await compressImage(file, 900, 0.60);
+    const compressed = await compressImage(file, 700, 0.45);
 
     if(!compressed || !compressed.base64){
   console.error("Imagen inválida o vacía");
@@ -3602,7 +3602,7 @@ $("inputPhoto").onchange = async (e) => {
     }
   }catch(err){
   console.error(err);
-  toast("La imagen se agregó, pero falló el guardado local", 3200);
+  toast("No se pudo guardar la foto en el dispositivo. Probá tomarla de nuevo.", 3200);
 }
 
   e.target.value = "";

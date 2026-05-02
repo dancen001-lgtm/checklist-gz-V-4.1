@@ -2,7 +2,6 @@
    Offline/Online (PWA). 1=Cumple, 0=No cumple.
    Autor: generado para AMPM
 */
-
 /* =========================
    CONFIGURACIÓN
 ========================= */
@@ -1009,7 +1008,11 @@ current = {
 function renderQuestion(){
   if(!current) return;
   const a = current.answers[qIdx];
-  if(!a){ finishEval(); return; }
+  if(!a){
+  qIdx = Math.max(0, current.answers.length - 1);
+  finishEval();
+  return;
+}
 
   $("kArea").textContent = a.area;
   $("kQuestion").textContent = `Pregunta ${qIdx + 1}`;
@@ -1026,14 +1029,35 @@ function renderQuestion(){
 
 function setAnswer(val){
   if(!current) return;
+
+  // 🔥 BLOQUEO: evita doble click / doble ejecución
+  if(window.__processingAnswer) return;
+  window.__processingAnswer = true;
+
   saveCurrentNote();
+
+  if(!current.answers[qIdx]){
+    finishEval();
+    window.__processingAnswer = false;
+    return;
+  }
+
   current.answers[qIdx].val = val;
   current.updatedAt = nowISO();
   upsertEval(current);
 
+  if(qIdx >= current.answers.length - 1){
+    finishEval();
+    window.__processingAnswer = false;
+    return;
+  }
+
   qIdx++;
   renderQuestion();
+
+  window.__processingAnswer = false;
 }
+
 function saveGeneralNotes(){
   if(!current) return;
 

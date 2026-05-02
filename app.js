@@ -12,7 +12,7 @@
 const SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzJQwiOq1xRUN1_kHvXBf5POr10jKfTtEmQguQm2UpoLNIPWn4lbtfT_ulvlYCcX74u1Q/exec";
 // Alias usado en partes viejas del código (NO borrar)
 const SCRIPT_URL = SCRIPT_WEB_APP_URL;
-const FRONTEND_VERSION = "GZ-login-v4.2.7";
+const FRONTEND_VERSION = "GZ-login-v4.2.8";
 const STRICT_VERSION_MODE = true;
 let backendVersionDetected = "";
 let versionAlignmentState = "checking";
